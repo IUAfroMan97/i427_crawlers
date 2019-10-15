@@ -3,46 +3,23 @@
 import crawler
 import time
 import os
+
 import multiprocessing as mp
 from multiprocessing import Pool
+
+from collections import deque
 import urllib.request
 import urllib.parse
-import urllib.robotparser
-import shutil
-import tempfile
+from bs4 import BeautifulSoup
 
+import hashlib
 
+from pymongo import MongoClient
 
-#import concurrent.futures
+db_uri = '127.0.0.1:27017'
 
 def main():
     start = time.time()
-
-    ### Processes
-
-    #Process(target=crawl, args=(crawler.Crawler("C{}".format(p)),)3
-    #c = crawler.Crawler("Test")
-    #t = Process(target=crawl, args=crawler.Crawler("Test"))
-
-    # print(f"Server[{os.getppid()}]")
-    # processes = [Process(target=crawl, args=[crawler.Crawler(f'C{p}')]) for p in range(1,7)]   
-
-    # for p in processes:
-    #     p.start()
-
-
-    # for p in processes:
-    #     p.join()
-
-
-    ### Older Style
-
-    # with concurrent.futures.ProcessPoolExecutor() as executor:
-    #     f1 = executor.submit(crawl, crawler.Crawler('C1'))
-    #     print(f1.result())
-
-
-    ### Pooling (modern simple)
 
     with Pool(8) as p:
         p.map(crawl, [crawler.Crawler(f'C{n}',) for n in range(7)])
@@ -52,14 +29,62 @@ def main():
 def crawl(crawler):
     pid = mp.current_process().pid
     crawler.setPid(pid)
+    db = crawler.connect_db(db_uri)
     print(f"{crawler.name}[{crawler.pid}] is crawling ...")
-    
-    with urllib.request.urlopen('http://iu.edu/') as response:
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-            shutil.copyfileobj(response, tmp_file)
-    
-    with open(tmp_file.name) as html:
-        pass
+    #todo Implement the Crawler
+
+    save_location = os.getcwd() + '/files/' ## change this as needed
+    starting_link = ['https://en.wikipedia.org/wiki/Special:Random'] ## seed
+    d = deque(starting_link)
+
+    page_num = 1
+    last_num_of_links = len(d)
+    st = time.time()
+    while(time.time()-st < 10):
+        u = urllib.parse.urlparse(d.popleft())
+        if u.geturl() != 'https://en.wikipedia.org/wiki/Special:Random':
+            if u.geturl() not in db.crawler.find():
+                #print('Found unique link : {}'.format(db.crawler.find({'url': u.geturl()})))
+                pass
+            else:
+                print([doc for doc in db.crawler.find({'url':u.geturl()})])
+        else:
+            print([doc for doc in db.crawler.find({'url':u.geturl()})])
+        with urllib.request.urlopen(u.geturl()) as f:
+            page = f.read()
+            soup = BeautifulSoup(page, 'html.parser')
+            #print('CURRENT LINK: {}'.format(u.geturl()))
+            #print('Parsing for links ...')
+            start = time.time()
+            for link in soup.findAll('a'):
+                l = link.get('href')
+                if l:
+                    if l[:2] == '//':
+                        new_url = l[2:]
+                        if new_url not in d:
+                            d.append(new_url)
+                    if l[0] == '/':
+                        new_url = u.scheme+'://'+u.netloc+l
+                        if new_url not in d:
+                            d.append(new_url)
+                    if l[:8] == 'https://':
+                        if l not in d:
+                            d.append(l)
+            #print('Found {} pages in {} sec(s)'.format(len(d)-last_num_of_links, time.time()-start))
+            last_num_of_links = len(d)
+            
+            start = time.time()
+            h = hashlib.md5()
+            h.update(u.geturl().encode('utf-8'))
+            with open(str(os.path.join(save_location, h.hexdigest()+'.html')), 'w') as nf:
+                nf.write(str(soup.encode('utf-8')))
+                nf.close()
+            #print('Cached new page: {}'.format(u.geturl()) + ' in {} sec(s)'.format(time.time()-start))
+
+            ## TODO: Connect to db and write hash and file
+            db.crawler.insert_one({'crawler_name' : crawler.name, 'crawler_pid': crawler.pid, 'url_hash': h.hexdigest(), 'url': u.geturl(), 'path': save_location+h.hexdigest()+'.html'})
+        page_num += 1
+
 
     print(f"{crawler.name}[{crawler.pid}] has finished crawling.")
     return True

@@ -1,4 +1,5 @@
 import os
+from pymongo import MongoClient
 
 class Crawler(object):
     def __init__(self, name):
@@ -8,5 +9,8 @@ class Crawler(object):
     def setPid(self, pid):
         self.pid = pid
 
-    
-    
+    def connect_db(self, db):
+        client = MongoClient(db)
+        db_client = client.crawler
+        print("DB Status : {}".format(db_client.command("serverStatus")))
+        return db_client
