@@ -21,15 +21,15 @@ db_uri = '127.0.0.1:27017'
 def main():
     start = time.time()
 
+    crawlers = [crawler.Crawler(f'C{n}',) for n in range(7)]
     with Pool(8) as p:
-        p.map(crawl, [crawler.Crawler(f'C{n}',) for n in range(7)])
-
+        p.map(crawl, crawlers)
     print("Finished in {} secs.".format(round(time.time()-start, 2)))
 
 def crawl(crawler):
     pid = mp.current_process().pid
     crawler.setPid(pid)
-    db = crawler.connect_db(db_uri)
+    client,db = crawler.connect_db(db_uri)
     print(f"{crawler.name}[{crawler.pid}] is crawling ...")
     #todo Implement the Crawler
 
@@ -40,52 +40,59 @@ def crawl(crawler):
     page_num = 1
     last_num_of_links = len(d)
     st = time.time()
-    while(time.time()-st < 10):
-        u = urllib.parse.urlparse(d.popleft())
-        if u.geturl() != 'https://en.wikipedia.org/wiki/Special:Random':
-            if u.geturl() not in db.crawler.find():
-                #print('Found unique link : {}'.format(db.crawler.find({'url': u.geturl()})))
-                pass
+    while(time.time()-st < 60):
+        try:
+            u = urllib.parse.urlparse(d.popleft())
+            if u.geturl() != 'https://en.wikipedia.org/wiki/Special:Random':
+                if u.geturl() not in db.crawler.find():
+                    #print('Found unique link : {}'.format(db.crawler.find({'url': u.geturl()})))
+                    pass
+                else:
+                    print([doc for doc in db.crawler.find({'url':u.geturl()})])
             else:
                 print([doc for doc in db.crawler.find({'url':u.geturl()})])
-        else:
-            print([doc for doc in db.crawler.find({'url':u.geturl()})])
-        with urllib.request.urlopen(u.geturl()) as f:
-            page = f.read()
-            soup = BeautifulSoup(page, 'html.parser')
-            #print('CURRENT LINK: {}'.format(u.geturl()))
-            #print('Parsing for links ...')
-            start = time.time()
-            for link in soup.findAll('a'):
-                l = link.get('href')
-                if l:
-                    if l[:2] == '//':
-                        new_url = l[2:]
-                        if new_url not in d:
-                            d.append(new_url)
-                    if l[0] == '/':
-                        new_url = u.scheme+'://'+u.netloc+l
-                        if new_url not in d:
-                            d.append(new_url)
-                    if l[:8] == 'https://':
-                        if l not in d:
-                            d.append(l)
-            #print('Found {} pages in {} sec(s)'.format(len(d)-last_num_of_links, time.time()-start))
-            last_num_of_links = len(d)
-            
-            start = time.time()
-            h = hashlib.md5()
-            h.update(u.geturl().encode('utf-8'))
-            with open(str(os.path.join(save_location, h.hexdigest()+'.html')), 'w') as nf:
-                nf.write(str(soup.encode('utf-8')))
-                nf.close()
-            #print('Cached new page: {}'.format(u.geturl()) + ' in {} sec(s)'.format(time.time()-start))
+            with urllib.request.urlopen(u.geturl()) as f:
+                page = f.read()
+                soup = BeautifulSoup(page, 'html.parser')
+                #print('CURRENT LINK: {}'.format(u.geturl()))
+                #print('Parsing for links ...')
+                start = time.time()
+                for link in soup.findAll('a'):
+                    l = link.get('href')
+                    if l:
+                        if l[:2] == '//':
+                            new_url = l[2:]
+                            if new_url not in d:
+                                d.append(new_url)
+                        if l[0] == '/':
+                            new_url = u.scheme+'://'+u.netloc+l
+                            if new_url not in d:
+                                d.append(new_url)
+                        if l[:8] == 'https://':
+                            if l not in d:
+                                d.append(l)
+                #print('Found {} pages in {} sec(s)'.format(len(d)-last_num_of_links, time.time()-start))
+                last_num_of_links = len(d)
+                
+                start = time.time()
+                h = hashlib.md5()
+                h.update(u.geturl().encode('utf-8'))
+                with open(str(os.path.join(save_location, h.hexdigest()+'.html')), 'w') as nf:
+                    nf.write(str(soup.encode('utf-8')))
+                    nf.close()
+                #print('Cached new page: {}'.format(u.geturl()) + ' in {} sec(s)'.format(time.time()-start))
 
-            ## TODO: Connect to db and write hash and file
-            db.crawler.insert_one({'crawler_name' : crawler.name, 'crawler_pid': crawler.pid, 'url_hash': h.hexdigest(), 'url': u.geturl(), 'path': save_location+h.hexdigest()+'.html'})
-        page_num += 1
+                ## TODO: Connect to db and write hash and file
+                if u.geturl() == 'https://en.wikipedia.org/wiki/Special:Random':
+                    pass
+                else:
+                    db.crawler.insert_one({'crawler_name' : crawler.name, 'crawler_pid': crawler.pid, 'url_hash': h.hexdigest(), 'url': u.geturl(), 'path': save_location+h.hexdigest()+'.html'})
+            page_num += 1
+        except:
+            pass
+        
 
-
+    crawler.disconnect_db(client)
     print(f"{crawler.name}[{crawler.pid}] has finished crawling.")
     return True
 

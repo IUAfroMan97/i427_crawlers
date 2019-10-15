@@ -22,5 +22,4 @@ client = MongoClient()
 db = client.crawler
 collection = db['crawler']
 
-
-print([doc for doc in db.crawler.find()])
+print("DB Status : {}".format(db.command("serverStatus")))

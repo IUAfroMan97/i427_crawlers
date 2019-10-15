@@ -13,4 +13,8 @@ class Crawler(object):
         client = MongoClient(db)
         db_client = client.crawler
         print("DB Status : {}".format(db_client.command("serverStatus")))
-        return db_client
+        return client, db_client
+    
+    def disconnect_db(self, db):
+        db.close()
+        return True
