@@ -12,7 +12,7 @@ class Crawler(object):
     def connect_db(self, db):
         client = MongoClient(db)
         db_client = client.crawler
-        print("DB Status : {}".format(db_client.command("serverStatus")))
+        #print("DB Status : {}".format(db_client.command("serverStatus")))
         return client, db_client
     
     def disconnect_db(self, db):

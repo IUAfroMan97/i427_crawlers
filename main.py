@@ -20,9 +20,10 @@ db_uri = '127.0.0.1:27017'
 
 def main():
     start = time.time()
-
-    crawlers = [crawler.Crawler(f'C{n}',) for n in range(7)]
-    with Pool(8) as p:
+    num_cpus = os.cpu_count()
+    print(f"[+] Using {num_cpus} cpus")
+    crawlers = [crawler.Crawler(f'C{n}',) for n in range(num_cpus-2)]
+    with Pool(num_cpus-1) as p:
         p.map(crawl, crawlers)
     print("Finished in {} secs.".format(round(time.time()-start, 2)))
 
