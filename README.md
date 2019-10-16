@@ -9,7 +9,7 @@
 <p>I'm currently working on making a public mongoDB server for easier testing.
 See the following links for installing mongodb.</p>
 <ul>
-    <li>Windows: <a href="https://docs.mongodb.com/manual/tutorial/install-mongodb-on-windows/"></a></li>
-    <li>Mac: <a href="https://docs.mongodb.com/manual/tutorial/install-mongodb-on-os-x/"></a></li>
-    <li>Linux: <a href="https://docs.mongodb.com/manual/administration/install-on-linux/"></a></li>
+    <li>Windows: https://docs.mongodb.com/manual/tutorial/install-mongodb-on-windows/</li>
+    <li>Mac: https://docs.mongodb.com/manual/tutorial/install-mongodb-on-os-x/</li>
+    <li>Linux: https://docs.mongodb.com/manual/administration/install-on-linux/</li>
 </ul>
