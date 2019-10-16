@@ -3,6 +3,7 @@
 import crawler
 import time
 import os
+import sys
 
 import multiprocessing as mp
 from multiprocessing import Pool
@@ -20,11 +21,14 @@ db_uri = '127.0.0.1:27017'
 
 def main():
     start = time.time()
-    num_cpus = os.cpu_count()
+    num_cpus = round(os.cpu_count()/2)
     print(f"[+] Using {num_cpus} cpus")
-    crawlers = [crawler.Crawler(f'C{n}',) for n in range(num_cpus-2)]
-    with Pool(num_cpus-1) as p:
+    crawlers = [crawler.Crawler(f'C{n}',) for n in range(num_cpus)]
+    with Pool(num_cpus) as p:
         p.map(crawl, crawlers)
+    client = MongoClient()
+    db = client.crawler
+    print(f"[+] Added {len([doc for doc in db.crawler.find({})])} entries to the database")
     print("Finished in {} secs.".format(round(time.time()-start, 2)))
 
 def crawl(crawler):
@@ -47,9 +51,11 @@ def crawl(crawler):
             if u.geturl() != 'https://en.wikipedia.org/wiki/Special:Random':
                 if u.geturl() not in db.crawler.find():
                     #print('Found unique link : {}'.format(db.crawler.find({'url': u.geturl()})))
+                    #sys.stdout.write("\033[F")
                     pass
                 else:
-                    print([doc for doc in db.crawler.find({'url':u.geturl()})])
+                    #print([doc for doc in db.crawler.find({'url':u.geturl()})])
+                    pass
             else:
                 print([doc for doc in db.crawler.find({'url':u.geturl()})])
             with urllib.request.urlopen(u.geturl()) as f:
@@ -94,6 +100,7 @@ def crawl(crawler):
         
 
     crawler.disconnect_db(client)
+    #print(f"[+] Added {len([doc for doc in db.crawler.find({})])} entries to the database")
     print(f"{crawler.name}[{crawler.pid}] has finished crawling.")
     return True
 
